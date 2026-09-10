@@ -1,0 +1,7 @@
+voyageai>=0.3.0
+psycopg[binary]>=3.1
+pgvector>=0.3.0
+PyYAML>=6.0
+qdrant-client>=1.12
+fastembed>=0.4.0
+mcp>=1.2                 # MCP server (odoo_index.mcp_server) for remote agents

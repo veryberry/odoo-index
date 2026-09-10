@@ -1,0 +1,12 @@
+# Template for installed_modules.txt (which is gitignored — it lists a real prod
+# install and is kept out of the repo). Only used when config.yaml sets
+# `only_installed: true`; with the default `false` this file is never read.
+#
+# Copy to installed_modules.txt and fill with one technical module name per line,
+# e.g. from:  odoo-bin shell -> env['ir.module.module'].search([('state','=','installed')]).mapped('name')
+account
+sale
+purchase
+stock
+mrp
+mail

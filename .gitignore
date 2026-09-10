@@ -1,0 +1,18 @@
+# secrets — NEVER commit the real key/DSN
+.env
+.env.*
+!.env.example
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# local scratch
+*.bak
+*.log
+
+# prod module inventory — internal; copy installed_modules.txt.example instead
+installed_modules.txt

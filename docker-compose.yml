@@ -1,0 +1,31 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: odoo_index_db
+    environment:
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD: odoo
+      POSTGRES_DB: odoo_index
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    shm_size: "1g"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U odoo -d odoo_index"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: odoo_index_qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrantdata:/qdrant/storage
+
+volumes:
+  pgdata:
+  qdrantdata:

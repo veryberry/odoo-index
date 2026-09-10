@@ -1,0 +1,176 @@
+# Labeled eval set for the Postgres-vs-Qdrant head-to-head.
+#
+# Two query CLASSES, deliberately mixed, because the two stores differ per class:
+#   * identifier  — a bare code token (`_action_assign`, `stock.quant`). Exercises
+#                   Postgres' literal ILIKE fast-path (Voyage-free). Qdrant has no
+#                   literal layer, so this is where PG should win on precision.
+#   * nl          — a conceptual "how did X change" question. The real semantic
+#                   duel: pgvector vs dense+BM25. Expected near-tie.
+#
+# `relevant` = the commit SHAs that genuinely answer the query. EMPTY = skipped by
+# the scorer, so an unlabeled query is harmless scratch. Populate it with the
+# labeling helper (runs on the VM against the live corpus):
+#
+#     python eval/label.py              # only labels queries whose relevant is []
+#     python eval/label.py --requery    # re-pool even already-labeled ones
+#
+# It pools top-k from BOTH stores (TREC-style pooling), you tick the real hits,
+# and it writes the SHAs back here. Aim to end with ~20+ labeled queries.
+#
+# `class` is metadata for you (not read by the scorer) — keep it so you can read
+# PG-vs-QD per class in the report by eye.
+
+queries:
+  # ---- identifier class: bare code tokens -> PG literal fast-path -----------
+  - query: "_action_assign"
+    class: identifier
+    module: stock
+    relevant: []
+
+  - query: "_action_done"
+    class: identifier
+    module: stock
+    relevant: []
+
+  - query: "_action_confirm"
+    class: identifier
+    module: sale
+    relevant: []
+
+  - query: "_prepare_invoice"
+    class: identifier
+    module: sale
+    relevant: []
+
+  - query: "_compute_qty_delivered"
+    class: identifier
+    module: sale
+    relevant: []
+
+  - query: "_prepare_procurement_values"
+    class: identifier
+    module: null
+    relevant: []
+
+  - query: "_get_default_journal"
+    class: identifier
+    module: account
+    relevant: []
+
+  - query: "_compute_amount"
+    class: identifier
+    module: account
+    relevant: []
+
+  - query: "reserved_quantity"
+    class: identifier
+    module: stock
+    relevant: []
+
+  - query: "reservation_date"
+    class: identifier
+    module: stock
+    relevant: []
+
+  - query: "message_post"
+    class: identifier
+    module: null
+    relevant: []
+
+  - query: "_compute_display_name"
+    class: identifier
+    module: null
+    relevant: []
+
+  - query: "_valid_field_parameter"
+    class: identifier
+    module: null
+    relevant: []
+
+  - query: "name_get"
+    class: identifier
+    module: null
+    relevant: []          # removed API — hits should be REF/removal commits
+
+  # ---- nl class: conceptual "how did X change" -> semantic duel ------------
+  - query: "how did stock move reservation change"
+    class: nl
+    module: stock
+    relevant: []
+
+  - query: "name_get replaced by _compute_display_name"
+    class: nl
+    module: null
+    tag: REF
+    relevant: []
+
+  - query: "attrs and states attributes removed from xml views"
+    class: nl
+    tag: REF
+    relevant: []
+
+  - query: "x2many command tuples replaced by Command helper"
+    class: nl
+    module: null
+    relevant: []
+
+  - query: "account move posting _post hook refactor"
+    class: nl
+    module: account
+    relevant: []
+
+  - query: "how did invoice tax computation change"
+    class: nl
+    module: account
+    relevant: []
+
+  - query: "sale order line display_type section note handling"
+    class: nl
+    module: sale
+    relevant: []
+
+  - query: "how did delivered quantity computation on sale order change"
+    class: nl
+    module: sale
+    relevant: []
+
+  - query: "purchase order receipt picking generation refactor"
+    class: nl
+    module: purchase
+    relevant: []
+
+  - query: "procurement pull push rules multi-step routes refactor"
+    class: nl
+    module: stock
+    relevant: []
+
+  - query: "mrp production reservation on split or backorder"
+    class: nl
+    module: mrp
+    relevant: []
+
+  - query: "mail thread message_post signature and parameter change"
+    class: nl
+    module: mail
+    relevant: []
+
+  - query: "onchange methods migrated to computed fields"
+    class: nl
+    module: null
+    tag: REF
+    relevant: []
+
+  - query: "how did lot and serial number reservation change"
+    class: nl
+    module: stock
+    relevant: []
+
+  - query: "ORM search and _search method signature change"
+    class: nl
+    module: null
+    relevant: []
+
+  - query: "how did payment reconciliation on account move change"
+    class: nl
+    module: account
+    relevant: []

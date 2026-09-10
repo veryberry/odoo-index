@@ -1,0 +1,111 @@
+# odoo-commit-index configuration
+# All filtering lives here so the rules are auditable in one place.
+
+source: community            # label stored per row; use "enterprise" for a second pass
+repo: /opt/odoo              # path to a FULL clone of odoo/odoo on the VM
+rev_range: "17.0..19.0"      # only commits reachable from 19.0 but not 17.0
+
+# Which top-level roots to consider at all. Everything else is ignored.
+include_roots:
+  - "odoo/"                  # the framework core
+  - "addons/"                # community addons
+
+filters:
+  # ---- module-level exclusion (by addons/<module> name) --------------------
+  # A module is EXCLUDED if it matches any exclude glob AND no allow glob.
+  # (allow overrides exclude.)
+  module_exclude_globs:
+    - "l10n_*"               # all country localizations ...
+    - "point_of_sale"        # POS ...
+    - "pos_*"                # ... note: pos_* (underscore) — NOT "pos*" which
+                             #     would catch unrelated modules like postmark_*
+    - "spreadsheet*"         # spreadsheet engine + dashboards
+    - "payment_*"            # all payment providers ...
+
+  module_allow_globs:        # exceptions that override the excludes above
+    - "l10n_de*"             # Germany (kept per spec)
+    - "l10n_ch*"             # Switzerland (kept per spec)
+    # ---- EDGE CASES: installed on prod but excluded by your literal rules. ----
+    # Uncomment any you actually customize / need migration signal for:
+    # - "l10n_at*"                 # Austria — INSTALLED on prod
+    # - "l10n_din5008*"            # German DIN-5008 document layouts — INSTALLED
+    # - "spreadsheet"              # INSTALLED (base spreadsheet)
+    # - "spreadsheet_account"      # INSTALLED
+    # - "spreadsheet_dashboard*"   # INSTALLED (dashboards)
+    # ---- payment providers actually installed in prod DB (kept) ----
+    - "payment_custom"
+    - "payment_paypal"
+    - "payment_novalnet"
+    - "payment_novalnet_ext"
+    - "payment_sepa_direct_debit"
+    # NOTE: base module "payment" does not start with "payment_" so it is never
+    # excluded — the framework payment layer is always kept.
+
+  # ---- optionally restrict to the modules installed on prod --------------
+  # false = index ALL addons except the excludes above (broader recall,
+  #         captures transitive deps & framework knowledge).
+  # true  = additionally drop any addon NOT in installed_modules_file.
+  only_installed: false
+  installed_modules_file: "installed_modules.txt"   # one technical name per line
+
+  # ---- per-file skips (applied inside every commit's diff) ---------------
+  # These files are dropped from the curated diff (filename may still appear).
+  skip_pot: true                       # *.pot
+  skip_i18n_po: true                   # */i18n/*.po
+  skip_static_lib: true                # */static/lib/**  (vendored JS/CSS)
+  skip_minified: true                  # *.min.*
+  lockfiles:
+    - "package-lock.json"
+    - "yarn.lock"
+    - "pnpm-lock.yaml"
+    - "poetry.lock"
+    - "Pipfile.lock"
+
+  # ---- asset diff cap ----------------------------------------------------
+  # For these extensions, if a SINGLE file's diff exceeds asset_diff_max_chars,
+  # replace its body with a one-line stub (keeps the fact it changed, drops the
+  # token-heavy noise). Set X here:
+  asset_extensions: ["js", "css", "scss", "less"]
+  asset_diff_max_chars: 2000
+
+  # ---- global per-commit diff cap (token safety net) --------------------
+  # ~24000 chars ~= 6k tokens. Prevents one mass-refactor commit from
+  # dominating the embedding budget / diluting retrieval.
+  commit_diff_max_chars: 24000
+
+  # ---- commit-kind skips -------------------------------------------------
+  skip_merges: true                    # structural merges (git --no-merges)
+  skip_subject_tags: ["MERGE"]         # also drop subjects like "[MERGE] ..."
+
+# ---- embedding ----------------------------------------------------------
+embed:
+  model: "voyage-code-4"               # $0.12/M + first 200M tokens FREE.
+                                       # Same 32k ctx & 1024 default dim as code-3,
+                                       # tuned for coding-agent retrieval -> drop-in.
+                                       # NOTE: never mix models in one index; if you
+                                       # switch models, re-embed ALL rows.
+  input_type_document: "document"
+  input_type_query: "query"
+  output_dimension: 1024               # 256 | 512 | 1024 | 2048
+  batch_size: 128                      # docs per request
+  batch_max_chars: 400000              # ~char budget per request (safety)
+  price_per_million_tokens: 0.12       # for the running cost estimate (0 within free 200M)
+
+# ---- sparse (lexical) vectors for Qdrant --------------------------------
+# Generated LOCALLY by fastembed — costs $0 in Voyage. Postgres uses its own
+# tsvector/pg_trgm instead and ignores this.
+sparse:
+  model: "Qdrant/bm25"                 # BM25; server applies IDF. No corpus fit.
+
+# ---- Qdrant -------------------------------------------------------------
+qdrant:
+  url: "http://localhost:6333"
+  collection: "odoo_commits"
+  dense_name: "dense"
+  sparse_name: "bm25"
+  fusion: "rrf"                        # rrf | dbsf (server-side fusion)
+
+# ---- database -----------------------------------------------------------
+# DATABASE_URL env var overrides this if set. Postgres is BOTH a search store
+# AND the durable vector cache that Qdrant loads from (so Voyage is paid once).
+database_url: "postgresql://odoo:odoo@localhost:5432/odoo_index"
