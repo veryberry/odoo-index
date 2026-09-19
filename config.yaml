@@ -73,6 +73,13 @@ filters:
   # dominating the embedding budget / diluting retrieval.
   commit_diff_max_chars: 24000
 
+  # ---- git-level pre-filter (performance) --------------------------------
+  # Translate the file/module skips above into `git log` exclude pathspecs so
+  # git never generates the diffs we would discard anyway (.pot/.po, static/lib,
+  # minified, lockfiles, excluded modules). Same rows out, far less I/O.
+  # Set false to make git emit everything and filter in Python only.
+  git_pathspec_prefilter: true
+
   # ---- commit-kind skips -------------------------------------------------
   skip_merges: true                    # structural merges (git --no-merges)
   skip_subject_tags: ["MERGE"]         # also drop subjects like "[MERGE] ..."
