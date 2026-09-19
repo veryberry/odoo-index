@@ -131,13 +131,59 @@ python -m odoo_index.cli search "removed _get_default_journal" --module account
 ## Indexing enterprise too
 
 Roughly half your installed Odoo modules live in the separate `odoo/enterprise`
-repo. Index it as a second source into the same DB:
+repo. It is indexed as a **second source into the same DB** — commit SHAs never
+collide between the two repos, so the rows simply coexist and `--source` slices
+them apart at query time.
+
+`config.enterprise.yaml` is that second pass, pre-made. It differs from
+`config.yaml` in exactly three keys — everything else (filters, caps, embed
+settings, DB) is deliberately identical so both corpora are filtered by the same
+rules:
+
+| Key | community | enterprise |
+|---|---|---|
+| `source` | `community` | `enterprise` |
+| `repo` | `/opt/odoo` | `/opt/enterprise` |
+| `include_roots` | `odoo/`, `addons/` | `.` |
+
+> **The `include_roots` change is not optional.** `odoo/enterprise` has no
+> `odoo/` or `addons/` prefix — modules sit at the repo root
+> (`account_accountant/`, `web_studio/`, …). Reusing the community roots makes
+> `git log -- odoo/ addons/` match nothing and you index **zero** commits.
+> `Filters.module_of` falls back to the first path segment, so the module-level
+> exclude/allow globs (`l10n_*`, `pos_*`, `spreadsheet*`, `payment_*`) keep
+> working unchanged — and they do drop a lot of enterprise
+> (`l10n_*_reports`, `pos_*`).
+
+⚠️ enterprise is **licensed third-party source**: do the Voyage opt-out *before*
+the first `embed` on this source (see the privacy section above). That is the
+only irreversible step here.
+
+> **`embed` is source-agnostic.** It takes every row `WHERE embedding IS NULL`,
+> whichever config you pass — `-c` selects the key/model/DB, **not** which rows
+> are sent. So the moment the enterprise `build` lands, the next `embed` run
+> (either config) ships enterprise diffs to Voyage. There is no community-only
+> embed once enterprise rows exist: opt out first, or finish the community
+> embed before building enterprise.
 
 ```bash
-ODOO_REPO=/opt/enterprise python -m odoo_index.cli build   # after editing
-# config.yaml: set source: enterprise  (and point repo/ODOO_REPO at the clone)
+set -a; source .env; set +a
+export PYTHONPATH=src
+# NOTE: -c is a top-level flag — it must come BEFORE the subcommand.
+python -m odoo_index.cli -c config.enterprise.yaml build
+python -m odoo_index.cli stats                            # est. cost (all sources)
+python -m odoo_index.cli -c config.enterprise.yaml embed
+python -m odoo_index.cli -c config.enterprise.yaml load-qdrant --source enterprise
 ```
-Then filter searches with `--source community|enterprise`, or search across both.
+
+`ODOO_REPO=/opt/enterprise` overrides `repo` if your clone lives elsewhere.
+Then filter searches with `--source community|enterprise`, or omit `--source`
+to search across both. Hits carry the right `github_url` either way —
+`mcp_server` maps `enterprise` to `github.com/odoo/enterprise`.
+
+Note `only_installed: false` pulls in every enterprise module. Since enterprise
+is much less likely to be useful outside what you actually run, `true` plus a
+filled `installed_modules.txt` is an easier call here than it is for community.
 
 ## Serve to a remote agent (MCP)
 
